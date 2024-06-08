@@ -14,7 +14,7 @@
 ```
 DISASSEMBLER
 │  disassembler.py          // 反汇编器类
-│  READMD.md
+│  README.md
 │  test.py                  // 测试
 │
 ├─bin
