@@ -18,7 +18,7 @@ class Disassembler:
     '''
     简单的反汇编器
     '''
-    def __init__(self, binary_path, arch = CS_ARCH_X86, mode = CS_MODE_64):
+    def __init__(self, binary_path:str, arch = CS_ARCH_X86, mode = CS_MODE_64):
         '''
         以给定的硬件架构初始化反汇编器
         
@@ -28,7 +28,7 @@ class Disassembler:
         mode: 寻址模式,默认64位
         '''
         # 反汇编时使用
-        self.mode = Cs(arch, mode)
+        self.cs = Cs(arch, mode)
         self.binary = lief.parse(binary_path)
         
     def extract_bin_info(self):
@@ -55,12 +55,26 @@ class Disassembler:
         self.str_info = None
         self.thrird_party_lib = None
         
-    def disassemble_section(self):
+    def disassemble_section(self, mode:str):
         '''
         对可执行程序代码段进行反汇编,以函数为单位给出反
         汇编指令序列
+        
+        # parameter
+            mode: 反汇编模式
+             - linear: 线性反汇编(默认)
+             - recursive: 递归反汇编
         '''
-        # TODO: 实现以函数为单位的反汇编
+        print("disassemble by", mode, "mode")
+        if mode == "linear":
+            self.__disassemble_linear()
+        elif mode == "recursive":
+            self.__disassemble_recursive()
+        else:
+            raise DisasModeError(
+                "Invalid disassemble mode, please choose from linear\
+                 and recursive"
+            )
         
     def extract_func_table(self):
         '''
@@ -80,3 +94,25 @@ class Disassembler:
         '''
         # TODO:写入xml文件
         
+    def __disassemble_linear(self):
+        '''
+        私有方法,以线性模式进行反汇编
+        '''
+        # text_s
+        
+    def __disassemble_recursive(self):
+        ''' 
+        私有方法,以递归模式进行反汇编
+        '''
+        # TODO: 实现递归反汇编
+        
+
+class DisasModeError(Exception):
+    '''
+    反汇编模式异常
+    只支持线性和递归两种
+    '''
+    def __init__(self, message):
+        super().__init__(message)
+        
+# Add more exception classed below
