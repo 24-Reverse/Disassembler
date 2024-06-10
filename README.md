@@ -17,8 +17,9 @@ DISASSEMBLER
 │  README.md
 │  test.py                  // 测试
 │
-├─bin
-│      a.exe                // 存放二进制文件
+├─bin                       // 存放二进制文件
+│      a.exe                // PE 文件
+│      a.out                // ELF 文件
 │       
 └─source_code               // 存放源代码文件
         a.c
