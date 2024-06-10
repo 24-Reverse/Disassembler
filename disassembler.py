@@ -12,7 +12,9 @@ Disassembler
 
 import lief
 from capstone import *
-from os import *
+# For colorful output
+from colorama import Fore, Style
+from colorama import init
 
 class Disassembler:
     '''
@@ -23,13 +25,15 @@ class Disassembler:
         以给定的硬件架构初始化反汇编器
         
         # parameters
-        binary_path: 二进制文件路径
-        arch: 指令集,默认为x86
-        mode: 寻址模式,默认64位
+            binary_path: 二进制文件路径
+            arch: 指令集,默认为x86
+            mode: 寻址模式,默认64位
         '''
         # 反汇编时使用
         self.cs = Cs(arch, mode)
         self.binary = lief.parse(binary_path)
+        
+        init()
         
     def extract_bin_info(self):
         '''
@@ -48,6 +52,10 @@ class Disassembler:
         # Just for example, feel free to modify
         self.hash = None
         self.header_info = None
+        
+        # lief.ELF.section的迭代器
+        self.sections = self.binary.sections
+        
         self.import_table = None
         self.export_table = None
         self.got = None
@@ -57,21 +65,20 @@ class Disassembler:
         
     def disassemble_section(self, mode:str):
         '''
-        对可执行程序代码段进行反汇编,以函数为单位给出反
-        汇编指令序列
+        对可执行程序.text节进行反汇编,以函数为单位给出反汇编指令序列
         
         # parameter
             mode: 反汇编模式
              - linear: 线性反汇编(默认)
              - recursive: 递归反汇编
         '''
-        print("disassemble by", mode, "mode")
+        self.__print_red(f"[Disassembler]: disassemble by {mode} mode")
         if mode == "linear":
             self.__disassemble_linear()
         elif mode == "recursive":
             self.__disassemble_recursive()
         else:
-            raise DisasModeError(
+            raise DisasmModeError(
                 "Invalid disassemble mode, please choose from linear\
                  and recursive"
             )
@@ -98,21 +105,64 @@ class Disassembler:
         '''
         私有方法,以线性模式进行反汇编
         '''
-        # text_s
+        # 迭代寻找.text section
+        text_section = None
+        for section in self.sections:
+            if section.name == '.text':
+                text_section = section
+        
+        if text_section is None:
+            raise TextSecError(
+                "Missing text section"
+            )
+        
+        # 获取.text节的虚拟地址和大小
+        text_virtual_address = text_section.virtual_address
+        text_size = text_section.size
+        text_content = text_section.content
+        
+        # disasm
+        # TODO: 添加函数名称
+        for insn in self.cs.disasm(
+            text_content, text_virtual_address
+        ):
+            print("0x%x:\t%s\t%s" %(insn.address, insn.mnemonic, insn.op_str))
         
     def __disassemble_recursive(self):
         ''' 
         私有方法,以递归模式进行反汇编
         '''
-        # TODO: 实现递归反汇编
+        # 迭代寻找.text section
+        text_section = None
+        for section in self.sections:
+            if section.name == '.text':
+                text_section = section
         
+        if text_section is None:
+            raise TextSecError(
+                "Missing text section"
+            )
+        # TODO: 实现递归反汇编
+    
+    def __print_red(self, text:str):
+        '''
+        私有方法, 辅助函数, 以红色打印字符串
+        '''
+        print(Fore.RED + text + Style.RESET_ALL)
 
-class DisasModeError(Exception):
+class DisasmModeError(Exception):
     '''
     反汇编模式异常
     只支持线性和递归两种
     '''
     def __init__(self, message):
         super().__init__(message)
-        
+
+class TextSecError(Exception):
+    '''
+    .text section异常
+    '''
+    def __init__(self, message):
+        super().__init__(message)
+
 # Add more exception classed below

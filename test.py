@@ -1,3 +1,4 @@
+# For using cmd args
 import argparse
 import disassembler
 
@@ -15,6 +16,7 @@ def args_init(**kwargs):
         help = "The disassemble mode, default by linear"
     )
     # Add more cmd args below
+    
     args = parser.parse_args()
     return args
 
@@ -23,8 +25,9 @@ def main(args):
     主函数, 创建反汇编器示例并进行反汇编
     '''
     bin_path = "bin/a"
-    disas = disassembler.Disassembler(bin_path)
-    disas.disassemble_section(args.mode)
+    disasm= disassembler.Disassembler(bin_path)
+    disasm.extract_bin_info()
+    disasm.disassemble_section(args.mode)
 
 if __name__ == "__main__":
     args = args_init()

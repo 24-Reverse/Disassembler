@@ -23,3 +23,13 @@ DISASSEMBLER
 └─source_code               // 存放源代码文件
         a.c
 ```
+
+## 运行
+
+通过提供命令行参数mode, 可以选择反汇编器使用线性模式(linear)还是递归模式(recursive), 打开终端, 键入: 
+
+```
+py -3 test.py --mode linear
+# or
+py -3 test.py --mode recursive
+```
