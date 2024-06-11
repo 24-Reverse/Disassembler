@@ -12,8 +12,8 @@ def args_init(**kwargs):
         "-m",
         type = str,
         choices = ['linear', 'recursive'],
-        default = 'linear',
-        help = "The disassemble mode, default by linear"
+        default = 'recursive',
+        help = "The disassemble mode, default by recursive"
     )
     # Add more cmd args below
     
