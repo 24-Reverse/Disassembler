@@ -12,7 +12,9 @@ Disassembler
 
 import lief
 import hashlib
+import angr
 from capstone import *
+from angrutils import *
 
 class Disassembler:
     '''
@@ -77,11 +79,13 @@ class Disassembler:
         '''
         # TODO: 实现提取函数表
     
-    def draw_control_flow_diagram(self, func):
+    def draw_control_flow_diagram(self, func=None):
         '''
         绘制指定函数的控制流图
         '''
         # TODO: 绘制指定函数的控制流图
+        if func is None:
+            self.__draw_cfg()
         
     def write_to_xml(self):
         '''
@@ -103,7 +107,7 @@ class Disassembler:
     
     def __compute_hash(self, filepath: str):
         """
-        计算文件的哈希值
+        私有方法，计算文件的哈希值
         """
         with open(filepath, 'rb') as infile:
             data = infile.read()
@@ -158,6 +162,9 @@ class Disassembler:
                 self.str_info = manager.string_table
     
     def __extract_elf_info(self):
+        '''
+        私有方法，打印 ELF 文件属性
+        '''
         binary = self.binary
 
         # 计算文件的哈希值
@@ -185,6 +192,20 @@ class Disassembler:
 
         # 第三方库信息
         self.thrird_party_lib = binary.libraries
+    
+    def __draw_cfg(self):
+        '''
+        私有方法，生成控制流图
+        '''
+        file_path = self.bin_path
+        p = angr.Project(file_path, auto_load_libs=False)
+
+        # 使用快速生成方法生成 CFG
+        cfg = p.analyses.CFGFast()
+
+        # CFG 可视化
+        file_name = file_path.split("/")[-1].split(".")[0]
+        plot_cfg(cfg, "cfg/"+file_name+".cfg", asminst=True, remove_imports=True, remove_path_terminator=True)  
 
     def __show_pe_info(self):
         '''
