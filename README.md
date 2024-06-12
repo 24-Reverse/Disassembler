@@ -21,6 +21,9 @@ DISASSEMBLER
 │      a.exe                // PE 文件
 │      a.out                // ELF 文件
 │       
+├─cfg                       // 存放 CFG 
+│      a.cfg.png
+│
 └─source_code               // 存放源代码文件
         a.c
 ```
