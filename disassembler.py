@@ -35,7 +35,7 @@ class Disassembler:
         self.bin_path = binary_path
         self.hash = None
         self.header_info = None
-        self.sectons = None
+        self.sections = None
         self.import_table = None
         self.export_table = None
         self.got = None
@@ -337,7 +337,7 @@ class Disassembler:
         }
 
         # 节信息
-        self.sectons = binary.sections
+        self.sections = binary.sections
 
         # 导入表
         if binary.has_imports:
@@ -372,7 +372,7 @@ class Disassembler:
         }
 
         # 节信息
-        self.sectons = binary.sections
+        self.sections = binary.sections
 
         # got 表
         self.got = binary.get_section(".got")
@@ -448,7 +448,7 @@ class Disassembler:
         print("======================================================")
         print("Sections")
         print("======================================================\n")
-        for section in self.sectons:
+        for section in self.sections:
             print(f"Section:            {section.name}")
             print(f"Virtual Address:    {hex(section.virtual_address)}")
             print(f"Size:               {section.size}")
@@ -505,7 +505,7 @@ class Disassembler:
         print("======================================================")
         print("Sections")
         print("======================================================\n")
-        for section in self.sectons:
+        for section in self.sections:
             print(f"Section:            {section.name}")
             print(f"Virtual Address:    {hex(section.virtual_address)}")
             print(f"Size:               {section.size}")
