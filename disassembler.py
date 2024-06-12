@@ -17,7 +17,8 @@ from colorama import Fore, Style    # For colorful output
 from colorama import init           # For colorful output
 from collections import deque       # For recursive disasm
 from capstone.x86_const import *    # For recursive disasm
-from angrutils import *             # For draw cfg
+#from angrutils import *             # For draw cfg
+import graphviz                     # For draw call_graph
 
 class Disassembler:
     '''
@@ -42,6 +43,7 @@ class Disassembler:
         self.plt = None
         self.str_info = None
         self.thrird_party_lib = None
+        self.func_addr_table = {}
 
         # 反汇编时使用
         self.cs = Cs(arch, mode)
@@ -96,8 +98,76 @@ class Disassembler:
         '''
         提取函数表
         '''
-        # TODO: 实现提取函数表
-    
+        self.func_table = []
+        self.third_party_func = []
+
+        # 提取自身函数
+        for symbol in self.binary.symbols:
+            if symbol.is_function and '@' not in symbol.name:
+                self.func_table.append(symbol.name)
+                self.func_addr_table[symbol.value] = symbol.name  # 记录函数地址
+
+        # 提取第三方库函数
+        if self.import_table:
+            for entry in self.import_table:
+                if entry.entries:
+                    for imp in entry.entries:
+                        if imp.name:  # 确保导入的条目有名字
+                            self.third_party_func.append(imp.name)
+
+        print("自有函数:", self.func_table)
+        print("第三方库函数:", self.third_party_func)
+        print("函数地址表:", self.func_addr_table)
+
+
+    def extract_call_graph(self):
+        '''
+        提取函数调用图
+        '''
+        # 使用angr的CFGFast来提取函数调用关系
+        project = angr.Project(self.bin_path)
+        cfg = project.analyses.CFGFast()
+
+        # 函数调用图是一个字典，键是调用函数，值是被调用函数列表
+        self.call_graph = {}
+
+        # Helper to get function name from address
+        def get_function_name(addr):
+            func = project.kb.functions.get(addr)
+            return func.name if func else hex(addr)
+
+        # 遍历CFG中的所有节点（基本块）
+        for node in cfg.nodes():
+            if hasattr(node, 'successors') and node.successors:
+                # 获取调用者函数名
+                caller = get_function_name(node.addr)
+                for successor in node.successors:
+                    # 获取被调用者函数名
+                    callee = get_function_name(successor.addr)
+                    if caller not in self.call_graph:
+                        self.call_graph[caller] = []
+                    if callee not in self.call_graph[caller]:
+                        self.call_graph[caller].append(callee)
+
+        for caller, callees in self.call_graph.items():
+            print(f"Function {caller} calls:")
+            for callee in callees:
+                print(f" - {callee}")
+
+
+    def draw_call_graph(self, output_file='call_graph'):
+        '''
+        绘制函数调用图
+        '''
+        dot = graphviz.Digraph(comment='Function Call Graph')
+
+        for caller, callees in self.call_graph.items():
+            for callee in callees:
+                dot.edge(caller, callee)
+
+        dot.render(output_file, format='png')
+        print(f"Call graph saved as {output_file}.png")
+
     def draw_control_flow_diagram(self, func=None):
         '''
         绘制指定函数的控制流图
@@ -123,7 +193,7 @@ class Disassembler:
             self.__show_elf_info()
         else:
             pass
-        
+    
     def __disassemble_linear(self):
         '''
         私有方法,以线性模式进行反汇编
@@ -150,9 +220,15 @@ class Disassembler:
         self.insns = self.cs.disasm(
             text_content, text_virtual_address
         )
-        for insn in self.insns:
-            print("0x%x:\t%s\t%s" %(insn.address, insn.mnemonic, insn.op_str))
         
+        current_func = None
+        for insn in self.insns:
+            if insn.address in self.func_addr_table:
+                current_func = self.func_addr_table[insn.address]
+                print(f"\nFunction: {current_func}")
+
+            print("0x%x:\t%s\t%s" %(insn.address, insn.mnemonic, insn.op_str))
+    
     def __disassemble_recursive(self):
         ''' 
         私有方法,以递归模式进行反汇编
@@ -192,6 +268,7 @@ class Disassembler:
             self.__print_red(f"function: {func.address:016x}")
             
         # 递归反汇编
+        current_func = None
         while(len(q) != 0):
             addr = q.popleft()
             try:
@@ -205,6 +282,10 @@ class Disassembler:
             offset = addr - text_virtual_address
             valid_content = text_content[offset:]
             
+            if addr in self.func_addr_table:
+                current_func = self.func_addr_table[addr]
+                print(f"\nFunction: {current_func}")
+
             while(valid_content != ''):
                 # 只解析一条指令
                 # 虽然只有一条指令, 但返回的是一个迭代器
