@@ -115,11 +115,6 @@ class Disassembler:
                         if imp.name:  # 确保导入的条目有名字
                             self.third_party_func.append(imp.name)
 
-        print("自有函数:", self.func_table)
-        print("第三方库函数:", self.third_party_func)
-        print("函数地址表:", self.func_addr_table)
-
-
     def extract_call_graph(self):
         '''
         提取函数调用图
@@ -148,12 +143,6 @@ class Disassembler:
                         self.call_graph[caller] = []
                     if callee not in self.call_graph[caller]:
                         self.call_graph[caller].append(callee)
-
-        for caller, callees in self.call_graph.items():
-            print(f"Function {caller} calls:")
-            for callee in callees:
-                print(f" - {callee}")
-
 
     def draw_call_graph(self, output_file='call_graph'):
         '''

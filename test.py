@@ -26,8 +26,11 @@ def main(args):
     '''
     bin_path = "bin/a"
     disasm= disassembler.Disassembler(bin_path)
+    disasm.extract_func_table()
     disasm.extract_bin_info()
-    #disasm.draw_call_graph() # 生成函数调用图
+    
+    #disasm.extract_call_graph()
+    #disasm.draw_call_graph()  # 绘制函数调用图
     disasm.disassemble_section(args.mode)
 
 if __name__ == "__main__":
