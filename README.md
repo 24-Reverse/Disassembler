@@ -18,16 +18,15 @@ E:.
 │  README.md
 │  test.py              # 主测试文件
 │
-
 ├─assemble              # 存放反汇编结果
 │      a.exe.txt
-│      kernel.txt
+│      kernel.txt       
 │
 ├─bin                   # 存放二进制文件
 │      a
 │      a.exe
 │      a.out
-│      kernel
+│      kernel           # 使用rust编写的一个OS内核编译结果
 │
 ├─cfg                   # 存放控制流图
 │      a.cfg.png
