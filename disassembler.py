@@ -9,30 +9,38 @@ Disassembler
   4.绘制控制流图
     
 '''
+import sys                          # For print to file
 import lief                         # For extract file info
 import hashlib                      # For extract file info
 import angr                         # For draw cfg
 from capstone import *              # For disasm
-from colorama import Fore, Style    # For colorful output
-from colorama import init           # For colorful output
 from collections import deque       # For recursive disasm
 from capstone.x86_const import *    # For recursive disasm
 from angrutils import *             # For draw cfg
+
+red_begin = "\033[31m"
+red_end   = "\033[0m"
 
 class Disassembler:
     '''
     简单的反汇编器
     '''
-    def __init__(self, binary_path:str, arch = CS_ARCH_X86, mode = CS_MODE_64):
+    def __init__(self, args, arch = CS_ARCH_X86, mode = CS_MODE_64):
         '''
         以给定的硬件架构初始化反汇编器
         
         # parameters
-            binary_path: 二进制文件路径
+            args: 命令行参数
             arch: 指令集,默认为x86
             mode: 寻址模式,默认64位
         '''
-        self.bin_path = binary_path
+        # 解析命令行参数
+        self.args = args
+        self.bin_path = args.path
+        self.mode = args.mode
+        self.tofile = args.tofile
+        
+        
         self.hash = None
         self.header_info = None
         self.sections = None
@@ -46,9 +54,8 @@ class Disassembler:
         # 反汇编时使用
         self.cs = Cs(arch, mode)
         # lief.ELF.Binary
-        self.binary = lief.parse(binary_path)
+        self.binary = lief.parse(self.bin_path)
         # 初始化颜色, 为了后面打印红色字符
-        init()
         
     def extract_bin_info(self):
         '''
@@ -72,25 +79,40 @@ class Disassembler:
         else:
             raise FileTypeError()
         
-    def disassemble_section(self, mode:str):
+    def disassemble_section(self):
         '''
         对可执行程序.text节进行反汇编,以函数为单位给出反汇编指令序列
         
         # parameter
             mode: 反汇编模式
-             - linear: 线性反汇编(默认)
-             - recursive: 递归反汇编
+             - linear: 线性反汇编
+             - recursive: 递归反汇编(默认)
         '''
-        self.__print_red(f"[Disassembler]: disassemble by {mode} mode")
-        if mode == "linear":
+        self.__print_red(f"[Disassembler]: disassemble by {self.mode} mode")
+        
+        
+        # 是否打印到文件
+        if self.tofile == 'y':
+            original_stdout = sys.stdout
+            file_name = 'assemble/' + self.bin_path[4:] + '.txt'
+            sys.stdout = open(file_name, 'w')
+            
+        if self.mode == "linear":
             self.__disassemble_linear()
-        elif mode == "recursive":
+        
+        elif self.mode == "recursive":
             self.__disassemble_recursive()
+            
         else:
             raise DisasmModeError(
                 "Invalid disassemble mode, please choose from linear\
                  and recursive"
             )
+        
+        # 关闭文件, 恢复标准输出
+        if self.tofile == 'y':
+            sys.stdout.close()
+            sys.stdout = original_stdout
         
     def extract_func_table(self):
         '''
@@ -156,16 +178,16 @@ class Disassembler:
     def __disassemble_recursive(self):
         ''' 
         私有方法,以递归模式进行反汇编
+        参考<二进制分析实战-第八章>
         '''
         # 开启详细反汇编模式
         self.cs.detail = True
         
         # 迭代寻找.text section
-        text_section = None
-        for section in self.sections:
-            if section.name == '.text':
-                text_section = section
-                
+        text_section = self.text_section
+            
+        # TODO: 多个.text段的情况
+        
         # 找不到.text section
         if text_section is None:
             raise TextSecError(
@@ -183,23 +205,33 @@ class Disassembler:
         map = dict()
         # 二进制文件入口点地址
         entry_addr = self.binary.entrypoint
-        q.append(entry_addr)
+        q.append((entry_addr, "entry_point:"))
         self.__print_red(f"entry point: {entry_addr:016x}")
         
         # 将函数符号加入队列
         for func in self.binary.functions:
-            q.append(func.address)
-            self.__print_red(f"function: {func.address:016x}")
+            func_addr = func.address
+            func_name = func.name
+            if func_name == '':
+                func_name = None
+            if self.__text_contains(func_addr):
+                tup = (func_addr, func_name)
+                q.append(tup)
+                self.__print_red(f"function: {func_addr:016x}, name: {func_name}")
             
         # 递归反汇编
         while(len(q) != 0):
-            addr = q.popleft()
+            (addr, func_name) = q.popleft()
             try:
                 # 已经反汇编过, 跳过这个入口
                 if map[addr] == True:
                     continue
             except:
                 pass
+            
+            # 若为函数, 打印出函数名称:
+            if func_name != None:
+                self.__print_red(f"{func_name}:")
             
             # 相对text节的偏移
             offset = addr - text_virtual_address
@@ -236,19 +268,29 @@ class Disassembler:
                         visited = map[target_addr]
                     except:
                         # 没访问过, 则加入队列
-                        if target_addr != 0:
-                            q.append(target_addr)
+                        if target_addr != 0 and self.__text_contains(target_addr):
+                            q.append((target_addr, None))
                             self.__print_red(f"    --> new target: {target_addr:016x}")
                             
-                    # 如果遇到无条件控制流指令或hlt指令, 则停止反汇编(跳转目标已经加入队列)
+                    # 如果遇到无条件控制流指令则停止反汇编(跳转目标已经加入队列)
                     if self.__is_unconditional_cflow_insn(insn):
                         break
-                    
+                
+                # hlt指令,停止反汇编 
                 elif insn.id == X86_INS_HLT:
                     break
                     
             self.__print_red("--------------------------------------------")
-
+            
+    def __text_contains(self, addr):
+        '''
+        计算一个给定的addr是否在text节中
+        '''
+        text_section = self.text_section
+        text_virtual_address = text_section.virtual_address
+        text_size = text_section.size
+        return (addr <= text_virtual_address + text_size and addr >= text_virtual_address)
+        
     def __is_cflow_insn(self, insn: CsInsn):
         '''
         私有方法, 判断指令insn是否是控制流指令
@@ -268,8 +310,10 @@ class Disassembler:
         
     def __get_ins_immediate_target(self, insn: CsInsn):
         '''
-        私有函数, 获取指令的直接跳转地址
-        只能获取直接跳转的地址, 若不是直接跳转则返回0
+        私有函数
+        
+        获取指令的直接跳转地址,只能获取直接跳转的地址, 
+        若不是直接跳转则返回0
         '''
         operands = insn.operands
         for operand in operands:
@@ -296,7 +340,12 @@ class Disassembler:
         '''
         私有方法, 辅助函数, 以红色打印字符串
         '''
-        print(Fore.RED + text + Style.RESET_ALL)
+        # 输出到文件时会产生乱码
+        if self.tofile:
+            print(text)
+        # 输出到终端时以红色输出
+        else:
+            print(red_begin + text + red_end)
     
     def __compute_hash(self, filepath: str):
         """
@@ -338,6 +387,12 @@ class Disassembler:
 
         # 节信息
         self.sections = binary.sections
+        
+        # 提取.text段
+        for section in self.sections:
+            if section.name == '.text':
+                self.text_section = section
+                break
 
         # 导入表
         if binary.has_imports:
@@ -373,6 +428,12 @@ class Disassembler:
 
         # 节信息
         self.sections = binary.sections
+        
+        # 提取.text段
+        for section in self.sections:
+            if section.name == '.text':
+                self.text_section = section
+                break
 
         # got 表
         self.got = binary.get_section(".got")
