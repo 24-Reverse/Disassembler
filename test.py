@@ -44,7 +44,10 @@ def main(args):
     disasm= disassembler.Disassembler(args)
     disasm.extract_bin_info()
     disasm.disassemble_section()
+    disasm.extract_func_table()
+    disasm.draw_call_graph()
 
+    
 if __name__ == "__main__":
     args = args_init()
     main(args)
