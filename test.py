@@ -46,6 +46,7 @@ def main(args):
     disasm.disassemble_section()
     disasm.extract_func_table()
     disasm.draw_call_graph()
+    disasm.draw_control_flow_graph()
 
     
 if __name__ == "__main__":

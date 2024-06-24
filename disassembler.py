@@ -6,7 +6,7 @@ Disassembler
   1. 提取二进制文件基本信息
   2. 以函数为单位进行反汇编
   3. 提取函数列表, 第三方库列表, 函数调用图
-  4.绘制控制流图
+  4. 绘制控制流图
     
 '''
 import sys                          # For print to file
@@ -16,7 +16,7 @@ import angr                         # For draw cfg
 from capstone import *              # For disasm
 from collections import deque       # For recursive disasm
 from capstone.x86_const import *    # For recursive disasm
-#from angrutils import *             # For draw cfg
+from angrutils import *             # For draw cfg
 import graphviz                     # For draw call_graph
 
 red_begin = "\033[31m"
@@ -179,13 +179,18 @@ class Disassembler:
         dot.render(output_file, format='png')
         print(f"Call graph saved as {output_file}.png")
 
-    def draw_control_flow_diagram(self, func=None):
+    def draw_control_flow_graph(self, func_name=None):
         '''
         绘制指定函数的控制流图
         '''
         # TODO: 绘制指定函数的控制流图
-        if func is None:
-            self.__draw_cfg()
+        if func_name is None:
+            self.__draw_full_cfg()
+        else:
+            if func_name in self.func_table:
+                self.__draw_func_cfg(func_name)
+            else:
+                raise FuncNameError(f"{func_name} is not found")
         
     def write_to_xml(self):
         '''
@@ -517,20 +522,36 @@ class Disassembler:
         # 第三方库信息
         self.thrird_party_lib = binary.libraries
     
-    def __draw_cfg(self):
+    def __draw_full_cfg(self):
         '''
-        私有方法，生成控制流图
+        私有方法，生成全局控制流图
         '''
+        # 生成 Project 对象
         file_path = self.bin_path
         p = angr.Project(file_path, auto_load_libs=False)
 
-        # 使用快速生成方法生成 CFG
-        cfg = p.analyses.CFGFast()
+        # 生成 CFG
+        cfg = p.analyses.CFGEmulated()
 
         # CFG 可视化
-        file_name = file_path.split("/")[-1].split(".")[0]
-        plot_cfg(cfg, "cfg/"+file_name+".cfg", asminst=True, remove_imports=True, remove_path_terminator=True)  
+        plot_cfg(cfg, "full_cfg", asminst=True, remove_imports=True, remove_path_terminator=True)  
 
+    def __draw_func_cfg(self, func_name):
+        '''
+        私有方法，生成指定函数控制流图
+        '''
+        # 生成 Project 对象
+        file_path = self.bin_path
+        p = angr.Project(file_path, auto_load_libs=False)
+
+        # 生成 CFG
+        cfg = p.analyses.CFGEmulated()
+
+        # CFG 可视化
+        for addr, func in p.kb.functions.items():
+            if func.name == func_name:
+                plot_cfg(cfg, f"{func_name}_cfg", asminst=True, func_addr={addr:True}, remove_imports=True, remove_path_terminator=True)
+    
     def __show_pe_info(self):
         '''
         私有方法，打印 PE 文件属性
@@ -698,11 +719,20 @@ class TextSecError(Exception):
 
 class FileTypeError(Exception):
     '''
-    文件类型异常(当前只支持 PE/ELF 文件)
+    文件类型异常
+    当前只支持 PE/ELF 文件
     '''
     def __init__(self):
         super().__init__(
             "Invalid file type, only PE/ELF file is supported currently"
         )
+
+class FuncNameError(Exception):
+    '''
+    函数名字异常
+    函数名不存在或错误
+    '''
+    def __init__(self, message):
+        super().__init__(message)
 
 # Add more exception classed below
